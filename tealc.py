@@ -32,25 +32,6 @@ def to_varuint(x):
             break
     return bytes(out)
 
-# def b32padfixparse(x):
-#     for i in range(8):
-#         try:
-#             return base64.b32decode(x + ('='*i))
-#         except:
-#             pass
-#     raise Exception("could not b32 decode {!r}".format(x))
-
-# def parse_addr(x):
-#     xbytes = b32padfixparse(x)
-#     addr = xbytes[:32]
-#     checksum = addr[32:]
-#     h = hashlib.new('sha512_256')
-#     h.update(addr)
-#     addrhash = h.digest()
-#     if addrhash[:len(checksum)] != checksum:
-#         raise Exception("addr parse failed in checksum")
-#     return addr
-
 b32re = re.compile(r'b32\((.*?)\)')
 base32re = re.compile(r'base32\((.*?)\)')
 b64re = re.compile(r'b64\((.*?)\)')
@@ -62,7 +43,7 @@ def parseByteConstant(args):
     if args[0] in ('b64', 'base64'):
         return base64.b64decode(args[1]), args[2:]
     if args[0].startswith('0x'):
-        return base64.b16decode(args[0][2:]), args[1:]
+        return base64.b16decode(args[0][2:].upper()), args[1:]
     m = b32re.match(args[0]) or base32re.match(args[0])
     if m:
         return base64.b32decode(m.group(1)), args[1:]
@@ -93,7 +74,9 @@ class Assembler:
     def __init__(self, sourceName='', version=1):
         self.out = io.BytesIO()
         self.intc = []
+        self.intcWritten = False
         self.bytec = []
+        self.bytecWritten = False
         self.sourceName = sourceName
         self.sourceLine = 0
         self.labels = {}
@@ -141,6 +124,18 @@ class Assembler:
         val = int(args[0], base=0)
         self.write_intc(val)
 
+    def write_intcblock(self, out, intc):
+        out.write(b'\x20') # intcblock
+        out.write(to_varuint(len(intc)))
+        for x in intc:
+            out.write(to_varuint(x))
+
+    def assemble_intcblock(self, op, args):
+        intc = [int(x, base=0) for x in args]
+        self.write_intcblock(self.out, intc)
+        self.intcWritten = True
+        self.intc = intc
+
     def write_bytec(self, constIndex):
         optimizedOp = _bytec_ops.get(constIndex)
         if optimizedOp:
@@ -180,6 +175,22 @@ class Assembler:
             raise Exception("byte expects an args")
         val, _ = parseByteConstant(args)
         self.bytestring(val)
+
+    def write_bytecblock(self, out, bytec):
+        out.write(b'\x26') # bytecblock
+        out.write(to_varuint(len(bytec)))
+        for x in bytec:
+            out.write(to_varuint(len(x)))
+            out.write(x)
+
+    def assemble_bytecblock(self, op, args):
+        bytec = []
+        while args:
+            val, args = parseByteConstant(args)
+            bytec.append(val)
+        self.write_bytecblock(self.out, bytec)
+        self.bytecWritten = True
+        self.bytec = bytec
 
     def assemble_arg(self, op, args):
         if len(args) != 1:
@@ -296,17 +307,12 @@ class Assembler:
     def getBytes(self):
         prefix = io.BytesIO()
         prefix.write(to_varuint(self.version))
-        if self.intc:
-            prefix.write(b'\x20') # intcblock
-            prefix.write(to_varuint(len(self.intc)))
-            for x in self.intc:
-                prefix.write(to_varuint(x))
-        if self.bytec:
-            prefix.write(b'\x26') # bytecblock
-            prefix.write(to_varuint(len(self.bytec)))
-            for x in self.bytec:
-                prefix.write(to_varuint(len(x)))
-                prefix.write(x)
+        if self.intc and not self.intcWritten:
+            self.write_intcblock(prefix, self.intc)
+            self.intcWritten = True
+        if self.bytec and not self.bytecWritten:
+            self.write_bytecblock(prefix, self.bytec)
+            self.bytecWritten = True
         prefix.write(self.resolveLabels())
         return prefix.getvalue()
 

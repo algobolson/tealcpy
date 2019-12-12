@@ -1,0 +1,38 @@
+// version 1
+intcblock 0 1 2 3 4 5
+bytecblock 0xcafed00d 0x1337 0x2001 0xdeadbeef 0x70077007
+intc_1
+intc_0
++
+intc 4
+*
+bytec_1
+bytec_0
+==
+bytec 4
+len
++
+arg_0
+len
+arg 5
+len
++
+bnz label1
+global MinTxnFee
+global MinBalance
+global MaxTxnLife
+txn Sender
+txn Fee
+bnz label1
+txn FirstValid
+txn LastValid
+txn Note
+txn Receiver
+txn Amount
+label1:
+txn CloseRemainderTo
+txn VotePK
+txn SelectionPK
+txn VoteFirst
+txn VoteLast
+gtxn 12 Fee

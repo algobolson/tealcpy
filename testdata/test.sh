@@ -8,3 +8,5 @@ for i in *.teal; do
 	python3 ../tealc.py < "${i}" | diff "${i}c" -
     fi
 done
+
+python3 assemble_bytes_test.py

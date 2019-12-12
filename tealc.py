@@ -37,16 +37,23 @@ base32re = re.compile(r'base32\((.*?)\)')
 b64re = re.compile(r'b64\((.*?)\)')
 base64re = re.compile(r'base64\((.*?)\)')
 
+# with padding fixup
+def b32decode(x):
+    short = len(x) % 8
+    if short:
+        x = x + ('=' * (8-short))
+    return base64.b32decode(x)
+
 def parseByteConstant(args):
     if args[0] in ('b32', 'base32'):
-        return base64.b32decode(args[1]), args[2:]
+        return b32decode(args[1]), args[2:]
     if args[0] in ('b64', 'base64'):
         return base64.b64decode(args[1]), args[2:]
     if args[0].startswith('0x'):
         return base64.b16decode(args[0][2:].upper()), args[1:]
     m = b32re.match(args[0]) or base32re.match(args[0])
     if m:
-        return base64.b32decode(m.group(1)), args[1:]
+        return b32decode(m.group(1)), args[1:]
     m = b64re.match(args[0]) or base64re.match(args[0])
     if m:
         return base64.b64decode(m.group(1)), args[1:]

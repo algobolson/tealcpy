@@ -1,4 +1,5 @@
 *$py.class
+__pycache__
 
 # C extensions
 *.so
